@@ -1,6 +1,6 @@
 ---
 title: "A4: "
-author: "Name and Student Number: "
+author: "Name and Student Number: Aditya Chauhan 169027493"
 ---
 
 ```{r active="", eval=FALSE}
@@ -38,6 +38,8 @@ There will be warnings about "no non-missing arguments", which are simply from c
 ```{r cyclones_by_name}
 cyclones <- read_parquet("cyclones_data.parquet")
 
+colnames(cyclones)
+
 cyclones_by_name <- cyclones |>
     group_by(Name, NameYear, Basin) |>
     arrange(date) |>
@@ -46,12 +48,21 @@ cyclones_by_name <- cyclones |>
         start_lon = lon[1],
         end_lat = lat[n()],
         end_lon = lon[n()],
-        # YOUR CODE HERE
+        start_date = min(date, na.rm = TRUE),
+        end_date = max(date, na.rm = TRUE),
+        lowest_lat = min(lat, na.rm = TRUE),
+        highest_lat = max(lat, na.rm = TRUE),
+        lowest_lon = min(lon, na.rm = TRUE),
+        highest_lon = max(lon, na.rm = TRUE),
+        max_wind = max(max_wind, na.rm = TRUE),
+        min_pressure = min(min_pressure, na.rm = TRUE),
         max_cat = factor(max(category, na.rm = TRUE), ordered = FALSE),
         .groups = "drop"
     ) |>
     mutate(
-        # YOUR CODE HERE
+        storm_length = as.numeric(difftime(end_date, start_date, units = "days")),
+        lat_change = end_lat - start_lat,
+        lon_change = end_lon - start_lon
     ) |>
     filter(!is.na(min_pressure) & !is.infinite(min_pressure))
 
@@ -96,7 +107,11 @@ cyclones_by_name
 Before modelling, we'll set up a training, validation, and test set. Put 60% of the data in the training set, 20% in the validation split, and the remaining 20% will go to the test set. Stratify the sets by `Basin` to ensure that the random assignment preserves the proportion of storms in each basin.
 
 ```{r cyclones_split}
-# YOUR CODE HERE
+cyclones_split <- initial_validation_split(
+    cyclones_by_name,
+    prop = c(train = 0.6, validation = 0.2),  
+    strata = Basin
+)
 
 cyclones_split
 ```
@@ -151,7 +166,11 @@ For all of the recipes, use the *training data* as the data set inside of `recip
 Use the `preproc <- list()` example from Chapter 11 of the [tmwr text](https://www.tmwr.org/compare) as a guide, but name the list as `cyclones_recipes` rather than `preproc` and give your recipes meaningful names. 
 
 ```{r cyclones_recipes}
-# YOUR CODE HERE
+cyclones_recipes <- list(
+    recipe_1 = recipe(min_pressure ~ max_wind + max_cat + storm_length, data = training(cyclones_split)),
+    recipe_2 = recipe(min_pressure ~ lat_change + lon_change + lowest_lat + highest_lat, data = training(cyclones_split)),
+    recipe_3 = recipe(min_pressure ~ start_lat + start_lon + max_cat + highest_lon, data = training(cyclones_split))
+)
 
 cyclones_recipes
 ```
@@ -194,7 +213,10 @@ cyclones_recipes
 Now we'll set up the workflow! Use `workflow_set()` to make a workflow set object that includes a linear model (with the `"lm"` engine) that includes the list of recipes from above.
 
 ```{r cyclones_workflow_set}
-# YOUR CODE HERE
+cyclones_workflow_set <- workflow_set(
+    preproc = cyclones_recipes,
+    models = list(lm = linear_reg() |> set_engine("lm"))
+)
 
 cyclones_workflow_set
 ```
@@ -222,7 +244,13 @@ cyclones_workflow_set
 Now let's fit to the training data! Use the `workflow_map()` function to fit all of the models. Use the `"tune_grid"` function (`fn`) to fit the models, making sure to set the seed. You'll need to set the "resamples" argument, which in this case means calculating a `validation_set()` from the split object made earlier.
 
 ```{r cyclones_fit}
-# YOUR CODE HERE
+set.seed(42)
+cyclones_fit <- cyclones_workflow_set |>
+    workflow_map(
+        fn = "fit_resamples",
+        resamples = validation_split,
+        metrics = metric_set(rmse, rsq)
+    )
 
 cyclones_fit
 
@@ -286,7 +314,8 @@ rf <- rand_forest(trees = 1000, mtry = tune(), min_n = 3) |>
 tune_grid <- tibble(mtry = 1:3)
 
 lm_versus_rf <- workflow_set(
-    # YOUR CODE HERE
+    preproc = cyclones_recipes,
+    models = list(lm = linear_reg() |> set_engine("lm"), rf = rf)
 ) |>
     workflow_map(
         fn = "tune_grid",
@@ -330,13 +359,11 @@ In the code chunk below, we'll select the best model and then finalize it. Use t
 The output should be two R objects: one for the best linear model and one for the best random forest. These should be the best *workflow*, do not fit the model yet.
 
 ```{r best_model, error=TRUE}
+best_lm <- lm_versus_rf |>
+    extract_workflow("recipe_1_lm")
 
-best_lm_workflow <- lm_versus_rf |>
-    extract_workflow_set_result("PUT THE NAME OF YOUR FINAL MODEL HERE") |>
-    select_best(metric = "rmse")
-
-# YOUR CODE HERE
-
+best_rf <- lm_versus_rf |>
+    extract_workflow("recipe_2_rf")
 ```
 
 ```{r}
@@ -371,7 +398,14 @@ Now let's see how they do on a test set! use the `last_fit()` function (you will
 In contrast to the previous step in which we found the best method for estimating our parameters, we're now estimating the final parameters!
 
 ```{r test_fit}
-# YOUR CODE HERE
+best_rf_hyperparameters <- lm_versus_rf |>
+    extract_workflow_set_result("recipe_2_rf") |>
+    select_best(metric = "rmse")
+
+best_rf <- best_rf |> finalize_workflow(best_rf_hyperparameters)
+
+test_lm <- best_lm |> last_fit(cyclones_split)
+test_rf <- best_rf |> last_fit(cyclones_split)
 
 cat("\nBest RMSE and R^2:\n")
 bind_rows(
@@ -414,6 +448,8 @@ bind_rows(
 ```
 
 **Manually Graded** (4 marks): Using the information above and throughout this assignment, which model do you think is best?
+
+The linear model outperforms the random forest in RMSE & in R^2, it provides more consistent and reliable predictions, it better captures the underlying relationships, and as an added plus, it is also more simple, so it is the better choice. The dataset has simple relationships and random forest struggles with the noise too. 
 
 
 ```{r active="", eval=FALSE}
