@@ -289,6 +289,8 @@ cyclones_workflow_set
 Now let's fit to the training data! Use the `workflow_map()` function to fit all of the models. Use the `"tune_grid"` function (`fn`) to fit the models, making sure to set the seed. You'll need to set the "resamples" argument, which in this case means calculating a `validation_set()` from the split object made earlier.
 
 ```{r cyclones_fit}
+validation_split <- validation_set(cyclones_split)
+
 set.seed(42)
 cyclones_fit <- cyclones_workflow_set |>
     workflow_map(
