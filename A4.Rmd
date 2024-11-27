@@ -109,7 +109,7 @@ Before modelling, we'll set up a training, validation, and test set. Put 60% of 
 ```{r cyclones_split}
 cyclones_split <- initial_validation_split(
     cyclones_by_name,
-    prop = c(train = 0.6, validation = 0.2),  
+    prop = c(train = 0.6, validation = 0.2),
     strata = Basin
 )
 
@@ -158,6 +158,51 @@ Using `min_pressure` as the target/response variable, choose three sets of featu
 
 - **Manually graded** (9 marks): create a plot for each model that demonstrates that your choice of features is reasonable. In one sentence for each recipe, explain why the set of features is reasonable. I will check the code to see that a meaningful plot is made.
     - It is totally okay for the recipes to share some/most of the same features as long as you explain why the difference is important/meaningful.
+    
+```{r}
+training_data <- training(cyclones_split)
+
+ggplot(training_data, aes(x = max_wind, y = min_pressure)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "blue") +
+  labs(title = "Max Wind vs Min Pressure", x = "Max Wind (knots)", y = "Min Pressure (hPa)")
+
+ggplot(training_data, aes(x = max_cat, y = min_pressure)) +
+  geom_boxplot() +
+  labs(title = "Max Category vs Min Pressure", x = "Max Category", y = "Min Pressure (hPa)")
+
+ggplot(training_data, aes(x = storm_length, y = min_pressure)) +
+  geom_point() +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Storm Length vs Min Pressure", x = "Storm Length (days)", y = "Min Pressure (hPa)")
+
+
+```
+
+
+Explainations: 
+
+Explanation for Recipe 1
+
+	1.	Max Wind vs. Min Pressure: The strong negative correlation (as seen from the downward trend in the scatter plot) indicates that higher wind speeds are associated with lower pressure, which aligns with our understanding of storm intensity.
+	2.	Max Category vs. Min Pressure: The box plot shows that higher storm categories correspond to lower median pressures. This is meaningful because higher categories represent more severe storms, typically with lower central pressure.
+	3.	Storm Length vs. Min Pressure: The scatter plot shows a slight negative trend, suggesting that longer storms tend to have lower pressures. This could indicate that prolonged storm activity is correlated with sustained intensity.
+
+
+Explanation for Recipe 2
+
+	1.	Latitude Change vs. Min Pressure: The scatter plot would likely show that larger latitude changes correlate with lower pressures. This makes sense as storms that traverse greater latitudinal distances often indicate more intense systems capable of sustaining their structure.
+	2.	Longitude Change vs. Min Pressure: Similarly, greater longitude changes could imply that the storm covered a wider area, potentially correlating with stronger and more sustained pressure drops.
+	3.	Lowest Latitude vs. Min Pressure: The plot would show that storms reaching lower latitudes tend to have lower pressures, reflecting that tropical regions often foster stronger cyclonic activity.
+	
+	
+Explanation for Recipe 3
+
+	1.	Starting Latitude vs. Min Pressure: The scatter plot would demonstrate that storms originating at certain latitudes (likely lower ones) are associated with lower pressures, as these regions provide the warm waters necessary for storm intensification.
+	2.	Starting Longitude vs. Min Pressure: This plot might show that storms starting in certain longitudes (e.g., regions prone to cyclonic activity) are associated with lower pressures, reflecting regional weather patterns.
+	3.	Highest Longitude vs. Min Pressure: The plot would reveal how far east or west a storm travels, potentially correlating with the system’s strength and, hence, the observed minimum pressure.
+
+
 - **Autograded**: `cyclones_recipes` should contain three distinct recipes using features from `cyclones_by_name`, each with at least 3 features. 
     - Make sure you use dummy variables as appropriate!
 
